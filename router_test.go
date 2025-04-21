@@ -10,16 +10,13 @@ import (
 	"github.com/martin3zra/router"
 )
 
-var route *router.Routing
-
 func TestMain(m *testing.M) {
-	route = router.New(http.NewServeMux())
 	exitValue := m.Run()
 	os.Exit(exitValue)
 }
 
 func TestHandlerMustBeCall(t *testing.T) {
-
+	route := router.New(http.NewServeMux())
 	route.Prefix("admin", func() {
 		route.Get("dashboard", dashboardHandler)
 	})
@@ -67,6 +64,8 @@ func TestHandlerMustBeCall(t *testing.T) {
 }
 
 func TestRouting_Group(t *testing.T) {
+
+	route := router.New(http.NewServeMux())
 
 	route.Prefix("admin", func() {
 		route.Get("dashboard", dashboardHandler)
