@@ -4,33 +4,30 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/gorilla/mux"
 )
 
-//Middleware ...
+// Middleware ...
 type Middleware func(http.HandlerFunc) http.HandlerFunc
 
-//Routing ...
+// Routing ...
 type Routing struct {
-	Router           *mux.Router
-	routerWithPrefix *mux.Router
-	prefixes         []string
-	middleware       []Middleware
-	isGroup          bool
+	Router     *http.ServeMux
+	prefixes   []string
+	middleware []Middleware
+	isGroup    bool
 }
 
-//NewRoute ...
-func NewRoute(r *mux.Router) *Routing {
+// New ...
+func New(r *http.ServeMux) *Routing {
 	return &Routing{Router: r}
 }
 
-//Get ...
+// Get ...
 func (r *Routing) Get(uri string, action http.HandlerFunc, name ...string) {
 	r.compose(uri, action, http.MethodGet, name...)
 }
 
-//Head ...
+// Head ...
 func (r *Routing) Head(uri string, action http.HandlerFunc, name ...string) {
 	r.compose(uri, action, http.MethodHead, name...)
 }
@@ -55,17 +52,17 @@ func (r *Routing) Delete(uri string, action http.HandlerFunc, name ...string) {
 	r.compose(uri, action, http.MethodDelete, name...)
 }
 
-//Option ...
+// Option ...
 func (r *Routing) Option(uri string, action http.HandlerFunc, name ...string) {
 	r.compose(uri, action, http.MethodOptions, name...)
 }
 
-//HandleFilesystem ...
-func (r *Routing) HandleFilesystem(uri string, handler http.Handler)  {
-	r.Router.PathPrefix(uri).Handler(handler).Methods("GET")
+// HandleFilesystem ...
+func (r *Routing) HandleFilesystem(uri string, handler http.Handler) {
+	// r.Router.PathPrefix(uri).Handler(handler).Methods("GET")
 }
 
-//Middleware provide a convenient mechanism for filtering HTTP requests entering your application.
+// Middleware provide a convenient mechanism for filtering HTTP requests entering your application.
 func (r *Routing) Middleware(middleware ...Middleware) *Routing {
 	r.middleware = middleware
 	return r
@@ -80,23 +77,32 @@ func (r *Routing) compose(uri string, action http.HandlerFunc, method string, na
 	}
 
 	url := uri
-	if len(url) > 0 {
+	if len(url) > 0 && url != "/" {
 		url = fmt.Sprintf("/%s", uri)
 	}
 
-	var route = r.Router.HandleFunc(url, wrapped).Methods(method)
-	if r.routerWithPrefix != nil {
-		route = r.routerWithPrefix.HandleFunc(url, wrapped).Methods(method)
+	if url == "/" {
+		url = ""
+	}
+
+	if len(r.prefixes) > 0 {
+		// collect the prefixes
+		var mergePrefix = fmt.Sprintf("/%s", strings.Join(r.prefixes, "/"))
+		var pattern = fmt.Sprintf("%s %s%s", method, mergePrefix, url)
+
+		r.Router.HandleFunc(pattern, wrapped)
+	} else {
+		r.Router.HandleFunc(fmt.Sprintf("%s %s", method, url), wrapped)
 	}
 
 	//If a least a name was provided, we get first one from the list and set as the Router name.
-	if len(name) > 0 {
-		route.Name(name[0])
-	}
+	// if len(name) > 0 {
+	// 	route.Name(name[0])
+	// }
 
 	//After the route has been configured, if we're outside of group Router then we'll clean up the middleware
 	//then when the user try to add a new Router and wan use a middleware then they have to specify again.
-	if r.routerWithPrefix == nil && !r.isGroup {
+	if len(r.prefixes) == 0 && !r.isGroup {
 		r.middleware = nil
 	}
 }
@@ -106,7 +112,6 @@ func (r *Routing) compose(uri string, action http.HandlerFunc, method string, na
 func (r *Routing) Prefix(prefix string, f func()) {
 
 	defer func() {
-		r.routerWithPrefix = nil
 		if len(r.prefixes) > 0 {
 			r.prefixes = r.prefixes[:len(r.prefixes)-1]
 		}
@@ -118,11 +123,7 @@ func (r *Routing) Prefix(prefix string, f func()) {
 
 	r.prefixes = append(r.prefixes, prefix)
 
-	var mergePrefix = strings.Join(r.prefixes, "/")
-
-	r.routerWithPrefix = r.Router.PathPrefix(fmt.Sprintf("/%s", mergePrefix)).Subrouter().StrictSlash(true)
 	f()
-
 }
 
 // Group allow you to share route attributes, such as middleware or namespaces
