@@ -1,5 +1,3 @@
 module github.com/martin3zra/router
 
-go 1.14
-
-require github.com/gorilla/mux v1.7.4
+go 1.23.6

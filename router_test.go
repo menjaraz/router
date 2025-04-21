@@ -7,20 +7,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"github.com/martin3zra/router"
 )
 
-var route *router.Routing
-
 func TestMain(m *testing.M) {
-	route = router.NewRoute(mux.NewRouter().StrictSlash(true))
 	exitValue := m.Run()
 	os.Exit(exitValue)
 }
 
 func TestHandlerMustBeCall(t *testing.T) {
-
+	route := router.New(http.NewServeMux())
 	route.Prefix("admin", func() {
 		route.Get("dashboard", dashboardHandler)
 	})
@@ -60,14 +56,16 @@ func TestHandlerMustBeCall(t *testing.T) {
 			route.Router.ServeHTTP(response, req)
 
 			if response.Code != item.status {
-				t.Errorf("handler returned wrong status code: got %v want %v",
-					response.Code, item.status)
+				t.Errorf("handler returned wrong status code: got %v want %v for route %s",
+					response.Code, item.status, item.path)
 			}
 		})
 	}
 }
 
 func TestRouting_Group(t *testing.T) {
+
+	route := router.New(http.NewServeMux())
 
 	route.Prefix("admin", func() {
 		route.Get("dashboard", dashboardHandler)
@@ -81,7 +79,7 @@ func TestRouting_Group(t *testing.T) {
 		})
 
 		route.Prefix("posts", func() {
-			route.Get("", func(w http.ResponseWriter, r *http.Request) {
+			route.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Header().Set("Content-Type", "application/json")
 				io.WriteString(w, `{"posts": "news"}`)
